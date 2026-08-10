@@ -23,6 +23,36 @@ enum AccountStatus {
   CLOSED
 }
 
+enum TransactionType {
+  TRANSFER
+  DEPOSIT
+  WITHDRAWAL
+  REVERSAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+enum IdempotencyStatus {
+  PROCESSING
+  COMPLETED
+}
+
+enum ActorType {
+  USER
+  ADMIN
+  SYSTEM
+}
+
 model User {
   id           String   @id @default(uuid(7)) @db.Uuid
   email        String   @unique
@@ -31,7 +61,9 @@ model User {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
 
-  accounts Account[]
+  accounts              Account[]
+  initiatedTransactions Transaction[]
+  idempotencyKeys       IdempotencyKey[]
 
   @@map("users")
 }
@@ -47,8 +79,103 @@ model Account {
   createdAt     DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
 
-  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user          User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ledgerEntries LedgerEntry[]
 
   @@index([userId])
   @@map("accounts")
+}
+
+model Transaction {
+  id                String            @id @default(uuid(7)) @db.Uuid
+  type              TransactionType
+  status            TransactionStatus
+  reference         String            @unique
+  amount            BigInt
+  currency          String            @db.Char(3)
+  narration         String?           @db.VarChar(140)
+  initiatedByUserId String?           @db.Uuid
+  metadata          Json?             @db.JsonB
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @db.Timestamptz(3)
+
+  initiatedBy   User?         @relation(fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  ledgerEntries LedgerEntry[]
+
+  @@index([initiatedByUserId])
+  @@index([status, type])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+model LedgerEntry {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  transactionId String          @db.Uuid
+  accountId     String          @db.Uuid
+  direction     LedgerDirection
+  amount        BigInt
+  balanceAfter  BigInt
+  createdAt     DateTime        @default(now()) @db.Timestamptz(3)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([accountId, createdAt])
+  @@map("ledger_entries")
+}
+
+model IdempotencyKey {
+  key            String            @db.VarChar(255)
+  userId         String            @db.Uuid
+  requestHash    String            @db.Char(64)
+  status         IdempotencyStatus
+  responseStatus Int?
+  responseBody   Json?             @db.JsonB
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  expiresAt      DateTime          @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([userId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model WebhookEvent {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  provider        String
+  providerEventId String    @unique
+  payload         Json      @db.JsonB
+  signatureValid  Boolean
+  processedAt     DateTime? @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@map("webhook_events")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  actorType  ActorType
+  actorId    String?   @db.Uuid
+  action     String
+  entityType String
+  entityId   String    @db.Uuid
+  payload    Json?     @db.JsonB
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model ReconciliationReport {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  runAt           DateTime @default(now()) @db.Timestamptz(3)
+  accountsChecked Int
+  driftCount      Int
+  details         Json     @db.JsonB
+
+  @@map("reconciliation_reports")
 }
