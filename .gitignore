@@ -60,3 +60,9 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Project spec PDFs (kept locally, not versioned)
 docs/
+
+/generated/prisma
+
+# Prisma-generated agent skill docs (regenerate via prisma init)
+.claude/skills/
+skills-lock.json
