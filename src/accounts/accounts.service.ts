@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { AccountNotFoundException } from '../common/exceptions/domain.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { AccountModel } from '../generated/prisma/models';
@@ -50,7 +47,7 @@ export class AccountsService {
     // 404 rather than 403 for someone else's account, so the endpoint cannot
     // be used to discover which account ids exist.
     if (!account || !canAccess(account, user)) {
-      throw new NotFoundException(`Account ${id} not found`);
+      throw new AccountNotFoundException(id);
     }
     return account;
   }
@@ -72,7 +69,7 @@ export class AccountsService {
   ): Promise<AccountModel> {
     const account = await this.prisma.account.findUnique({ where: { id } });
     if (!account) {
-      throw new NotFoundException(`Account ${id} not found`);
+      throw new AccountNotFoundException(id);
     }
 
     // Freezing SYSTEM_CASH would halt every deposit and withdrawal.

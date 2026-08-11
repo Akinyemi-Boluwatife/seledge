@@ -1,10 +1,9 @@
-import {
-  ConflictException,
-  Injectable,
-  OnModuleInit,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import {
+  DuplicateEmailException,
+  InvalidCredentialsException,
+} from '../common/exceptions/domain.exception';
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { AccountsService } from '../accounts/accounts.service';
@@ -37,7 +36,7 @@ export class AuthService implements OnModuleInit {
       where: { email: dto.email },
     });
     if (existing) {
-      throw new ConflictException('Email already registered');
+      throw new DuplicateEmailException();
     }
 
     const passwordHash = await argon2.hash(dto.password);
@@ -78,7 +77,7 @@ export class AuthService implements OnModuleInit {
     );
 
     if (!user || !passwordMatches) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     return {

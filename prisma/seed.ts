@@ -2,10 +2,20 @@ import 'dotenv/config';
 import * as argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
-import { AccountType, Role } from '../src/generated/prisma/enums';
+import {
+  AccountType,
+  LedgerDirection,
+  Role,
+  TransactionStatus,
+  TransactionType,
+} from '../src/generated/prisma/enums';
+import { LedgerService } from '../src/ledger/ledger.service';
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'password123';
 const SYSTEM_CASH_NUMBER = '0000000000';
+const OPENING_BALANCE = 5_000_000n;
+
+const ledger = new LedgerService();
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -62,12 +72,56 @@ async function main() {
     });
   }
 
+  await fundTestAccounts();
+
   const [users, accounts] = await Promise.all([
     prisma.user.count(),
     prisma.account.count(),
   ]);
   console.log(`seeded: ${users} users, ${accounts} accounts`);
   console.log(`login password for all seeded users: ${SEED_PASSWORD}`);
+}
+
+async function fundTestAccounts() {
+  const systemCash = await prisma.account.findUniqueOrThrow({
+    where: { accountNumber: SYSTEM_CASH_NUMBER },
+  });
+
+  for (const { accountNumber } of testUsers) {
+    const reference = `SEED-OPENING-${accountNumber}`;
+    const funded = await prisma.transaction.findUnique({ where: { reference } });
+    if (funded) continue;
+
+    const account = await prisma.account.findUniqueOrThrow({
+      where: { accountNumber },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.create({
+        data: {
+          type: TransactionType.DEPOSIT,
+          status: TransactionStatus.COMPLETED,
+          reference,
+          amount: OPENING_BALANCE,
+          currency: account.currency,
+          narration: 'Seed opening balance',
+        },
+      });
+
+      await ledger.post(tx, transaction.id, [
+        {
+          accountId: systemCash.id,
+          direction: LedgerDirection.DEBIT,
+          amount: OPENING_BALANCE,
+        },
+        {
+          accountId: account.id,
+          direction: LedgerDirection.CREDIT,
+          amount: OPENING_BALANCE,
+        },
+      ]);
+    });
+  }
 }
 
 main()

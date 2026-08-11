@@ -1,98 +1,118 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# LedgerCore
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A double-entry wallet and ledger API. Users hold balances, transfer to each
+other, deposit and withdraw. Balances are derived from an append-only ledger
+rather than stored in a mutable column.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Stack: NestJS · Prisma 7 · PostgreSQL 18 · JWT · class-validator · Docker
 
-## Description
+## Running it
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+Start Postgres and Redis:
 
 ```bash
-$ npm install
+docker compose up -d
 ```
 
-## Compile and run the project
+Copy `.env.example` to `.env` and fill it in, then:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npx prisma migrate dev
+npx prisma db seed
+npm run start:dev
 ```
 
-## Run tests
+API at `http://localhost:3000/api/v1`, docs at `http://localhost:3000/docs`.
 
-```bash
-# unit tests
-$ npm run test
+Seeded logins, all with password `password123`:
 
-# e2e tests
-$ npm run test:e2e
+| Email | Role |
+|---|---|
+| `alice@ledgercore.test` | user, ₦50,000 opening balance |
+| `bob@ledgercore.test` | user, ₦50,000 opening balance |
+| `admin@ledgercore.test` | admin |
 
-# test coverage
-$ npm run test:cov
+## Core rules
+
+- **Money is integer minor units (kobo).** Never floats. Stored as `BigInt`,
+  serialized as strings over HTTP so precision survives JavaScript clients.
+- **The ledger is the source of truth.** `balance = SUM(credits) − SUM(debits)`
+  over an account's entries. `accounts.cachedBalance` is a cache maintained in
+  the same database transaction; `GET /accounts/:id/balance` returns both plus
+  an `inSync` flag.
+- **Ledger entries are append-only.** No updates, no deletes. Corrections are
+  new reversing transactions.
+- **Every transaction nets to zero.** Enforced in `LedgerService` before any
+  write. Deposits and withdrawals balance against a seeded `SYSTEM_CASH`
+  account, which is expected to run negative.
+
+## Concurrency: why pessimistic locking
+
+Transfers take `SELECT ... FOR UPDATE` row locks on both accounts inside the
+transaction, before reading balances.
+
+**Why pessimistic over optimistic:** a transfer is short, touches exactly two
+rows, and conflicts on a hot account are common rather than rare. Optimistic
+locking would mean version columns, retry loops, and a client-visible failure
+mode that has to be explained. `FOR UPDATE` puts the correctness in one place —
+the balance you read is the balance you write against — and it is far easier to
+reason about, which matters most for the code that must not be wrong.
+
+**Why `ORDER BY id`:** simultaneous A→B and B→A transfers would otherwise lock
+the two rows in opposite orders and deadlock. Locking in a consistent order
+means one waits for the other. Verified with 50 opposing transfers across 25
+rounds: zero deadlocks.
+
+**Failure mode:** transfers from the same account serialize. Under heavy load on
+one account, throughput drops and requests queue. Correctness holds; latency
+does not. Mitigations if it ever mattered would be sharding balances or moving
+to an append-only design with asynchronous balance derivation — both out of
+scope here.
+
+**Defence in depth:** a `CHECK` constraint rejects any user account balance
+below zero. Before locking existed, 10 parallel ₦300 transfers against a ₦1,000
+balance produced 3 successes and 7 constraint violations surfacing as HTTP 500 —
+the money was correct, but only because the database caught what the application
+missed. With locking, the same test gives 3 × 201 and 7 × 422
+`INSUFFICIENT_FUNDS`.
+
+## Idempotency
+
+`POST /transfers` requires an `Idempotency-Key` header. Keys are scoped per user
+and expire after 24 hours.
+
+- Retrying with the same key replays the original response; the transfer applies
+  once.
+- Same key with a different body → `409 IDEMPOTENCY_CONFLICT`.
+- A retry arriving while the original is in flight → `409 REQUEST_IN_PROGRESS`.
+- If the handler fails, the key is released so a retry can proceed.
+
+The claim is committed before the transfer runs and deliberately sits outside
+the transfer's transaction — sharing it would let a rollback erase the claim and
+allow a double-apply.
+
+## Errors
+
+Every error returns the same envelope:
+
+```json
+{
+  "statusCode": 422,
+  "error": "INSUFFICIENT_FUNDS",
+  "message": "Insufficient funds: balance 150000, attempted 200000",
+  "timestamp": "2026-08-11T10:00:00.000Z",
+  "path": "/api/v1/transfers"
+}
 ```
 
-## Deployment
+`error` is a stable machine-readable code; `message` is for humans. Unhandled
+exceptions become `500 INTERNAL_ERROR` with no stack trace.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Resolved decisions
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Decision | Choice |
+|---|---|
+| Locking strategy | Pessimistic (`FOR UPDATE`) |
+| Amount type | `BigInt`, minor units, string-serialized |
+| Non-owned account | `404`, not `403` — avoids id enumeration |
+| Refresh tokens | Stretch goal, not implemented |
