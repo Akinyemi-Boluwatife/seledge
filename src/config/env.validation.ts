@@ -1,5 +1,13 @@
 import { plainToInstance } from 'class-transformer';
-import { IsInt, IsString, IsUrl, Max, Min, validateSync } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  IsUrl,
+  Max,
+  Min,
+  MinLength,
+  validateSync,
+} from 'class-validator';
 
 class EnvironmentVariables {
   @IsUrl({
@@ -16,12 +24,25 @@ class EnvironmentVariables {
 
   @IsString()
   NODE_ENV!: string;
+
+  @IsString()
+  @MinLength(32)
+  JWT_SECRET!: string;
+
+  @IsInt()
+  @Min(60)
+  JWT_EXPIRES_IN_SECONDS!: number;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
   const validated = plainToInstance(
     EnvironmentVariables,
-    { NODE_ENV: 'development', PORT: 3000, ...config },
+    {
+      NODE_ENV: 'development',
+      PORT: 3000,
+      JWT_EXPIRES_IN_SECONDS: 900,
+      ...config,
+    },
     { enableImplicitConversion: true },
   );
 
