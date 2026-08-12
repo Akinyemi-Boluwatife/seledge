@@ -1,4 +1,13 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiNotFoundResponse,
@@ -11,6 +20,7 @@ import { PaginatedDto } from '../common/dto/pagination.dto';
 import { TransactionQueryDto } from '../transfers/dto/transaction-query.dto';
 import { TransactionResponseDto } from '../transfers/dto/transaction-response.dto';
 import { TransfersService } from '../transfers/transfers.service';
+import { StatementsService } from '../statements/statements.service';
 import { AccountsService } from './accounts.service';
 import { AccountResponseDto } from './dto/account-response.dto';
 import { BalanceResponseDto } from './dto/balance-response.dto';
@@ -22,6 +32,7 @@ export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
     private readonly transfersService: TransfersService,
+    private readonly statementsService: StatementsService,
   ) {}
 
   @Get()
@@ -69,5 +80,39 @@ export class AccountsController {
   ): Promise<PaginatedDto<TransactionResponseDto>> {
     const account = await this.accountsService.findOne(id, user);
     return this.transfersService.findForAccount(account.id, query);
+  }
+
+  @Get(':id/statements/:period')
+  @ApiOperation({
+    summary: 'Monthly statement; 202 while it is still being generated',
+  })
+  @ApiNotFoundResponse({ description: 'Account does not exist or is not yours' })
+  async statement(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('period') period: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const account = await this.accountsService.findOne(id, user);
+    const result = await this.statementsService.request(account.id, period);
+
+    if (!result.ready) {
+      response.status(HttpStatus.ACCEPTED);
+      return {
+        statementId: result.statement.id,
+        status: result.statement.status,
+        period,
+      };
+    }
+
+    return {
+      statementId: result.statement.id,
+      status: result.statement.status,
+      period,
+      openingBalance: result.statement.openingBalance?.toString() ?? null,
+      closingBalance: result.statement.closingBalance?.toString() ?? null,
+      entryCount: result.statement.entryCount,
+      content: result.statement.content,
+    };
   }
 }

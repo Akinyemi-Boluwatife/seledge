@@ -36,6 +36,14 @@ class EnvironmentVariables {
   @IsString()
   @MinLength(32)
   WEBHOOK_SECRET!: string;
+
+  @IsString()
+  REDIS_HOST!: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  REDIS_PORT!: number;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -45,6 +53,7 @@ export function validateEnv(config: Record<string, unknown>) {
       NODE_ENV: 'development',
       PORT: 3000,
       JWT_EXPIRES_IN_SECONDS: 900,
+      REDIS_HOST: 'localhost',
       ...config,
     },
     { enableImplicitConversion: true },

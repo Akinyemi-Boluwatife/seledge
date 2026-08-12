@@ -48,6 +48,12 @@ enum IdempotencyStatus {
   COMPLETED
 }
 
+enum StatementStatus {
+  PENDING
+  READY
+  FAILED
+}
+
 enum ActorType {
   USER
   ADMIN
@@ -82,6 +88,7 @@ model Account {
 
   user          User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
   ledgerEntries LedgerEntry[]
+  statements    Statement[]
 
   @@index([userId])
   @@map("accounts")
@@ -179,4 +186,23 @@ model ReconciliationReport {
   details         Json     @db.JsonB
 
   @@map("reconciliation_reports")
+}
+
+model Statement {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  accountId      String          @db.Uuid
+  period         String          @db.VarChar(7)
+  status         StatementStatus @default(PENDING)
+  openingBalance BigInt?
+  closingBalance BigInt?
+  entryCount     Int?
+  content        Json?           @db.JsonB
+  failureReason  String?
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  completedAt    DateTime?       @db.Timestamptz(3)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([accountId, period])
+  @@map("statements")
 }
