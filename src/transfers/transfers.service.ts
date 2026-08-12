@@ -191,7 +191,7 @@ export class TransfersService {
   }
 }
 
-function assertTransferable(
+export function assertTransferable(
   source: AccountModel,
   destination: AccountModel,
   amount: bigint,

@@ -43,7 +43,9 @@ export class LedgerService {
     const written: LedgerEntryModel[] = [];
     for (const entry of ordered) {
       const delta =
-        entry.direction === LedgerDirection.CREDIT ? entry.amount : -entry.amount;
+        entry.direction === LedgerDirection.CREDIT
+          ? entry.amount
+          : -entry.amount;
 
       const account = await tx.account.update({
         where: { id: entry.accountId },
@@ -67,7 +69,7 @@ export class LedgerService {
   }
 }
 
-function assertBalanced(entries: LedgerEntryInput[]): void {
+export function assertBalanced(entries: LedgerEntryInput[]): void {
   if (entries.length < 2) {
     throw new UnbalancedLedgerException(0n);
   }

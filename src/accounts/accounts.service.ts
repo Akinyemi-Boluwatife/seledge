@@ -4,9 +4,18 @@ import { AccountNotFoundException } from '../common/exceptions/domain.exception'
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { AccountModel } from '../generated/prisma/models';
-import { AccountStatus, AccountType, ActorType, Role } from '../generated/prisma/enums';
+import {
+  AccountStatus,
+  AccountType,
+  ActorType,
+  Role,
+} from '../generated/prisma/enums';
 import { AuthenticatedUser } from '../auth/types/authenticated-user';
-import { PaginatedDto, PaginationQueryDto, paginate } from '../common/dto/pagination.dto';
+import {
+  PaginatedDto,
+  PaginationQueryDto,
+  paginate,
+} from '../common/dto/pagination.dto';
 import { MutableAccountStatus } from './dto/update-account-status.dto';
 
 export const SYSTEM_CASH_NUMBER = '0000000000';
@@ -133,7 +142,10 @@ export class AccountsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.account.update({ where: { id }, data: { status } });
+      const updated = await tx.account.update({
+        where: { id },
+        data: { status },
+      });
 
       await this.audit.record(tx, {
         actorType: ActorType.ADMIN,

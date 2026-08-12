@@ -22,7 +22,7 @@ export interface AuditEntry {
   action: AuditAction;
   entityType: string;
   entityId: string;
-  payload?: Record<string, unknown>;
+  payload?: Prisma.InputJsonObject;
 }
 
 @Injectable()
@@ -39,7 +39,7 @@ export class AuditService {
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId,
-        payload: (entry.payload ?? {}) as object,
+        payload: entry.payload ?? {},
       },
     });
   }
@@ -73,6 +73,10 @@ export class AuditService {
       this.prisma.auditLog.count({ where }),
     ]);
 
-    return paginate(rows.map(AuditLogResponseDto.from), total, query);
+    return paginate(
+      rows.map((log) => AuditLogResponseDto.from(log)),
+      total,
+      query,
+    );
   }
 }

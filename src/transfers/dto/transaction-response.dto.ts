@@ -66,7 +66,7 @@ export class TransactionResponseDto {
       currency: transaction.currency,
       narration: transaction.narration,
       createdAt: transaction.createdAt,
-      entries: entries.map(LedgerEntryResponseDto.from),
+      entries: entries.map((entry) => LedgerEntryResponseDto.from(entry)),
     };
   }
 }

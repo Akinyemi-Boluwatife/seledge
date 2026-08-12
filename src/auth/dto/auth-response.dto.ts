@@ -9,6 +9,9 @@ export class RegisterResponseDto extends AuthResponseDto {
   @ApiProperty({ example: '019fedab-ef52-7308-9fea-253ba51377fa' })
   userId!: string;
 
-  @ApiProperty({ example: '1000000001', description: 'Auto-created NGN wallet' })
+  @ApiProperty({
+    example: '1000000001',
+    description: 'Auto-created NGN wallet',
+  })
   accountNumber!: string;
 }

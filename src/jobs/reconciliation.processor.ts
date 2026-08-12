@@ -20,7 +20,11 @@ export class ReconciliationRunner {
 
   // Recomputes every balance from the ledger and reports drift. It never
   // corrects anything: a silent auto-fix would hide the bug that caused it.
-  async run(): Promise<{ id: string; accountsChecked: number; driftCount: number }> {
+  async run(): Promise<{
+    id: string;
+    accountsChecked: number;
+    driftCount: number;
+  }> {
     const rows = await this.prisma.$queryRaw<
       { id: string; accountNumber: string; cached: bigint; derived: bigint }[]
     >`

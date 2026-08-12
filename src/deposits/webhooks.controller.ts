@@ -76,7 +76,11 @@ export class WebhooksController {
         data: {
           provider: PROVIDER,
           providerEventId: dto.id,
-          payload: dto as unknown as object,
+          payload: {
+            event: dto.event,
+            id: dto.id,
+            data: { reference: dto.data.reference, amount: dto.data.amount },
+          },
           signatureValid: true,
         },
       });
@@ -85,7 +89,7 @@ export class WebhooksController {
         typeof error === 'object' &&
         error !== null &&
         'code' in error &&
-        (error as { code: unknown }).code === UNIQUE_VIOLATION
+        error.code === UNIQUE_VIOLATION
       ) {
         this.logger.log(`Duplicate provider event ${dto.id} ignored`);
         return null;

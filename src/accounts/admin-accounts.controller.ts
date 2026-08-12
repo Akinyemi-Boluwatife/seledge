@@ -51,7 +51,10 @@ export class AdminAccountsController {
     @Query('search') search?: string,
   ) {
     const page = await this.accountsService.searchForAdmin(query, search);
-    return { ...page, data: page.data.map(AccountResponseDto.from) };
+    return {
+      ...page,
+      data: page.data.map((account) => AccountResponseDto.from(account)),
+    };
   }
 
   @Get(':id/ledger')

@@ -37,7 +37,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const { status, code, message } = describe(exception);
 
-    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (status >= 500) {
       this.logger.error(
         `${request.method} ${request.url} -> ${code}`,
         exception instanceof Error ? exception.stack : String(exception),
@@ -73,7 +73,8 @@ function describe(exception: unknown): {
     const body = exception.getResponse();
     const message =
       typeof body === 'object' && body !== null && 'message' in body
-        ? ((body as { message: string | string[] }).message ?? exception.message)
+        ? ((body as { message: string | string[] }).message ??
+          exception.message)
         : exception.message;
 
     return {

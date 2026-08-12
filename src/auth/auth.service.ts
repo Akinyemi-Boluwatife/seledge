@@ -96,7 +96,9 @@ export class AuthService implements OnModuleInit {
       email: user.email,
       role: user.role,
       createdAt: user.createdAt,
-      accounts: user.accounts.map(AccountResponseDto.from),
+      accounts: user.accounts.map((account) =>
+        AccountResponseDto.from(account),
+      ),
     };
   }
 

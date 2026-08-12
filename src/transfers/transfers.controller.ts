@@ -38,12 +38,15 @@ export class TransfersController {
     description: 'Retrying with the same key replays the original response',
   })
   @ApiConflictResponse({
-    description: 'Key reused with a different body, or original still in flight',
+    description:
+      'Key reused with a different body, or original still in flight',
   })
   @ApiUnprocessableEntityResponse({
     description: 'Insufficient funds, self transfer, or currency mismatch',
   })
-  @ApiNotFoundResponse({ description: 'Source or destination account not found' })
+  @ApiNotFoundResponse({
+    description: 'Source or destination account not found',
+  })
   transfer(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateTransferDto,
@@ -53,7 +56,9 @@ export class TransfersController {
 
   @Get('transactions/:id')
   @ApiOperation({ summary: 'Read a transaction with its ledger entries' })
-  @ApiNotFoundResponse({ description: 'Not found or you were not a participant' })
+  @ApiNotFoundResponse({
+    description: 'Not found or you were not a participant',
+  })
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,

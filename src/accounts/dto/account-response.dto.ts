@@ -15,7 +15,8 @@ export class AccountResponseDto {
   status!: AccountStatus;
 
   @ApiProperty({
-    description: 'Balance in minor units (kobo), as a string to preserve precision',
+    description:
+      'Balance in minor units (kobo), as a string to preserve precision',
     example: '150000',
   })
   cachedBalance!: string;

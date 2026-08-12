@@ -19,6 +19,7 @@ import { StatementsProcessor } from './statements.processor';
         connection: {
           host: config.getOrThrow<string>('REDIS_HOST'),
           port: config.getOrThrow<number>('REDIS_PORT'),
+          db: config.getOrThrow<number>('REDIS_DB'),
         },
         defaultJobOptions: {
           attempts: 3,

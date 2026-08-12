@@ -12,7 +12,11 @@ export class DomainException extends HttpException {
 
 export class InvalidCredentialsException extends DomainException {
   constructor() {
-    super('INVALID_CREDENTIALS', 'Invalid credentials', HttpStatus.UNAUTHORIZED);
+    super(
+      'INVALID_CREDENTIALS',
+      'Invalid credentials',
+      HttpStatus.UNAUTHORIZED,
+    );
   }
 }
 

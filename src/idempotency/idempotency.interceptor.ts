@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { Observable, from, of, throwError } from 'rxjs';
-import { catchError, switchMap, tap } from 'rxjs/operators';
+import { catchError, concatMap, switchMap } from 'rxjs/operators';
 import { AuthenticatedRequest } from '../auth/types/authenticated-user';
 import { IdempotencyService } from './idempotency.service';
 
@@ -28,7 +28,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
       throw new BadRequestException('Idempotency-Key header is required');
     }
     if (!request.user) {
-      throw new BadRequestException('Idempotency requires an authenticated user');
+      throw new BadRequestException(
+        'Idempotency requires an authenticated user',
+      );
     }
 
     const userId = request.user.userId;
@@ -45,9 +47,12 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
 
     return next.handle().pipe(
-      tap((body) =>
-        this.idempotency.complete(userId, key, response.statusCode, body),
-      ),
+      // concatMap, not tap: the key must be marked COMPLETED before the
+      // response goes out, or a fast retry sees PROCESSING and gets a 409.
+      concatMap(async (body: unknown) => {
+        await this.idempotency.complete(userId, key, response.statusCode, body);
+        return body;
+      }),
       catchError((error: unknown) =>
         from(this.idempotency.release(userId, key)).pipe(
           switchMap(() => throwError(() => error)),

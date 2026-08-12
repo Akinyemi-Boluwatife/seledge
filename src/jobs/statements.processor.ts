@@ -28,7 +28,9 @@ export class StatementsProcessor extends WorkerHost {
 
       const movement = entries.reduce(
         (sum, e) =>
-          e.direction === LedgerDirection.CREDIT ? sum + e.amount : sum - e.amount,
+          e.direction === LedgerDirection.CREDIT
+            ? sum + e.amount
+            : sum - e.amount,
         0n,
       );
       const closing = opening + movement;

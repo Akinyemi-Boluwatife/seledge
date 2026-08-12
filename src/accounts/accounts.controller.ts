@@ -41,12 +41,14 @@ export class AccountsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<AccountResponseDto[]> {
     const accounts = await this.accountsService.findAllForUser(user);
-    return accounts.map(AccountResponseDto.from);
+    return accounts.map((account) => AccountResponseDto.from(account));
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get one of your accounts by id' })
-  @ApiNotFoundResponse({ description: 'Account does not exist or is not yours' })
+  @ApiNotFoundResponse({
+    description: 'Account does not exist or is not yours',
+  })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -60,7 +62,9 @@ export class AccountsController {
   @ApiOperation({
     summary: 'Get cached and ledger-derived balance side by side',
   })
-  @ApiNotFoundResponse({ description: 'Account does not exist or is not yours' })
+  @ApiNotFoundResponse({
+    description: 'Account does not exist or is not yours',
+  })
   async getBalance(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -72,7 +76,9 @@ export class AccountsController {
 
   @Get(':id/transactions')
   @ApiOperation({ summary: 'Paginated transaction history for your account' })
-  @ApiNotFoundResponse({ description: 'Account does not exist or is not yours' })
+  @ApiNotFoundResponse({
+    description: 'Account does not exist or is not yours',
+  })
   async transactions(
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: TransactionQueryDto,
@@ -86,7 +92,9 @@ export class AccountsController {
   @ApiOperation({
     summary: 'Monthly statement; 202 while it is still being generated',
   })
-  @ApiNotFoundResponse({ description: 'Account does not exist or is not yours' })
+  @ApiNotFoundResponse({
+    description: 'Account does not exist or is not yours',
+  })
   async statement(
     @Param('id', ParseUUIDPipe) id: string,
     @Param('period') period: string,

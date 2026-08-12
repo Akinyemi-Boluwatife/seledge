@@ -66,3 +66,4 @@ docs/
 # Prisma-generated agent skill docs (regenerate via prisma init)
 .claude/skills/
 skills-lock.json
+.env.test

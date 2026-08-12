@@ -44,6 +44,11 @@ class EnvironmentVariables {
   @Min(1)
   @Max(65535)
   REDIS_PORT!: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(15)
+  REDIS_DB!: number;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -54,6 +59,7 @@ export function validateEnv(config: Record<string, unknown>) {
       PORT: 3000,
       JWT_EXPIRES_IN_SECONDS: 900,
       REDIS_HOST: 'localhost',
+      REDIS_DB: 0,
       ...config,
     },
     { enableImplicitConversion: true },
@@ -62,7 +68,10 @@ export function validateEnv(config: Record<string, unknown>) {
   const errors = validateSync(validated, { skipMissingProperties: false });
   if (errors.length > 0) {
     const details = errors
-      .map((e) => `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`)
+      .map(
+        (e) =>
+          `${e.property}: ${Object.values(e.constraints ?? {}).join(', ')}`,
+      )
       .join('\n  ');
     throw new Error(`Invalid environment configuration:\n  ${details}`);
   }

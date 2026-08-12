@@ -18,7 +18,9 @@ export class CreateTransferDto {
   sourceAccountId!: string;
 
   @ApiProperty({ example: '1000000002' })
-  @Matches(/^\d{10}$/, { message: 'destinationAccountNumber must be 10 digits' })
+  @Matches(/^\d{10}$/, {
+    message: 'destinationAccountNumber must be 10 digits',
+  })
   destinationAccountNumber!: string;
 
   @ApiProperty({
