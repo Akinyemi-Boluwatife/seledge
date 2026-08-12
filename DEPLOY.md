@@ -31,12 +31,21 @@ every deploy, and pooling avoids exhausting connection slots.
 ## 2. Redis on Upstash
 
 1. Sign up at [upstash.com](https://upstash.com) and create a Redis database.
-2. From the details page, note the **endpoint host**, **port** (usually 6379)
-   and **password**.
+2. Take the **TCP** endpoint, not the HTTPS/REST one. Upstash shows it as:
 
-Check Upstash's current BullMQ guide before relying on this. BullMQ uses Redis
-blocking commands, which have documented caveats on Upstash. If it misbehaves,
-statements are the only feature affected — everything else works without Redis.
+   ```
+   rediss://default:PASSWORD@your-db.upstash.io:6379
+   ```
+
+   Note the double `s` in `rediss://` — that means TLS. From it you need the
+   **host**, **port** (6379) and **password**.
+
+The REST endpoint only works with Upstash's own SDK and does not support the
+blocking commands BullMQ relies on. It will not work here.
+
+Check Upstash's current BullMQ guide before relying on this. Blocking commands
+have documented caveats on their free tier. If it misbehaves, statements are the
+only feature affected — everything else works without Redis.
 
 ## 3. App on Render
 
@@ -50,10 +59,13 @@ statements are the only feature affected — everything else works without Redis
    | Dockerfile path | `./Dockerfile` |
    | Instance type | Free |
    | Health check path | `/health` |
-   | Pre-deploy command | `npx prisma migrate deploy` |
+   | Auto-Deploy | **Off** |
 
-   The pre-deploy command is how migrations run in production — the `migrate`
-   service in `docker-compose.yml` is local-only.
+   Auto-Deploy is off on purpose. Deploys are triggered from CI only after
+   tests pass — see step 4. Left on, Render would ship every push the moment it
+   lands, including broken ones.
+
+   Free tier has no pre-deploy command, so migrations also run from CI.
 
 3. Environment variables:
 
@@ -71,6 +83,9 @@ statements are the only feature affected — everything else works without Redis
    REDIS_TLS=true
    ```
 
+   `REDIS_TLS=true` is required for Upstash. Without it the connection is
+   refused.
+
    Generate each secret separately:
 
    ```bash
@@ -79,12 +94,50 @@ statements are the only feature affected — everything else works without Redis
 
    Never reuse the values from your local `.env`.
 
-4. Deploy. First build takes a few minutes.
+4. Copy the **Deploy Hook** URL from Settings → Deploy Hook. You need it in
+   step 4.
+5. Deploy once manually to confirm the build works. First build takes a few
+   minutes.
 
 Boot will fail loudly on any missing or malformed variable — that is the env
 validation doing its job, and the message names the offending variable.
 
-## 4. Keep it awake
+The first deploy will fail to serve traffic until migrations have run, which is
+step 4. Alternatively, run them once from your machine:
+
+```bash
+DATABASE_URL="<neon string>" npx prisma migrate deploy
+```
+
+## 4. Automated deploys, gated on tests
+
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs after the CI
+workflow succeeds on `master`:
+
+```
+push → CI: lint, typecheck, 153 tests
+         → migrations applied to Neon
+         → Render deploy hook fired
+```
+
+Migrations run before the new code goes live rather than racing it. Nothing
+deploys if a test fails.
+
+Add two repository secrets under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|---|---|
+| `PRODUCTION_DATABASE_URL` | the Neon connection string from step 1 |
+| `RENDER_DEPLOY_HOOK_URL` | the deploy hook from step 3 |
+
+The workflow checks out the exact commit CI tested, not the branch tip, so a
+push landing mid-run cannot deploy untested code.
+
+**Why not run migrations in the container?** The runtime image deliberately
+omits the Prisma CLI — including it costs about 480MB for something that runs
+once. CI has it already.
+
+## 5. Keep it awake
 
 Render free instances sleep after ~15 minutes idle. A sleeping instance runs no
 scheduled jobs, so nightly reconciliation and hourly cleanup would never fire.
@@ -100,7 +153,7 @@ rather than just a keep-alive.
 account. One always-on service uses ~730. A second free service will push you
 over and both get suspended.
 
-## 5. Verify
+## 6. Verify
 
 ```bash
 curl https://<your-app>.onrender.com/health
@@ -120,7 +173,7 @@ curl -X POST https://<your-app>.onrender.com/api/v1/auth/register \
 
 Docs at `https://<your-app>.onrender.com/docs`.
 
-## 6. Optional: seed demo data
+## 7. Optional: seed demo data
 
 The seed script is guarded against `NODE_ENV=production` on purpose. To create
 demo accounts for a portfolio link, run it locally against the Neon database:
@@ -138,7 +191,7 @@ Be deliberate about this — it writes to your live database.
 | | Local | Deployed |
 |---|---|---|
 | Postgres, Redis | Containers from `docker-compose.yml` | Neon and Upstash |
-| Migrations | `migrate` service, or `prisma migrate dev` | Render pre-deploy command |
+| Migrations | `migrate` service, or `prisma migrate dev` | CI, after tests pass |
 | Config | `.env` | Render environment variables |
 | Scheduled jobs | Always running | Only while the instance is awake |
 
@@ -153,8 +206,11 @@ or malformed. The error names it.
 **`Can't reach database server`** — check `sslmode=require` survived the paste
 into Render, and that you used the pooled Neon endpoint.
 
-**Redis connection errors** — `REDIS_TLS=true` is required for Upstash. Without
-it the connection is refused.
+**Redis connection errors** — `REDIS_TLS=true` is required for Upstash, and you
+must use the TCP endpoint rather than the REST/HTTPS one.
+
+**Deploy workflow never runs** — it only triggers on a *successful* CI run on
+`master`. Check the CI run went green first.
 
 **First request takes ~50 seconds** — the instance was asleep. Confirm the
 UptimeRobot monitor is running and pointed at the right URL.
