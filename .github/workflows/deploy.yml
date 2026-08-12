@@ -23,21 +23,40 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
+      # Until Render and Neon are configured, skip rather than fail: a red run
+      # on every push would train you to ignore the badge.
+      - name: Check deployment is configured
+        id: check
+        env:
+          DB: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$HOOK" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deployment secrets not set; skipping. See DEPLOY.md step 4."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v5
+        if: steps.check.outputs.configured == 'true'
         with:
           node-version: 24
           cache: npm
 
       - run: npm ci
+        if: steps.check.outputs.configured == 'true'
 
       # Migrations run before the new code goes live: the runtime image has no
       # Prisma CLI, and Render's free tier has no pre-deploy command.
       - name: Apply migrations to production
+        if: steps.check.outputs.configured == 'true'
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: npx prisma migrate deploy
 
       - name: Trigger Render deploy
+        if: steps.check.outputs.configured == 'true'
         env:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
