@@ -20,6 +20,9 @@ import { StatementsProcessor } from './statements.processor';
           host: config.getOrThrow<string>('REDIS_HOST'),
           port: config.getOrThrow<number>('REDIS_PORT'),
           db: config.getOrThrow<number>('REDIS_DB'),
+          password: config.get<string>('REDIS_PASSWORD'),
+          // Hosted Redis (Upstash and friends) requires TLS; local does not.
+          ...(config.get<boolean>('REDIS_TLS') ? { tls: {} } : {}),
         },
         defaultJobOptions: {
           attempts: 3,

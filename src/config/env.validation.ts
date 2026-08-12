@@ -1,6 +1,8 @@
 import { plainToInstance } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
+  IsOptional,
   IsString,
   IsUrl,
   Max,
@@ -49,6 +51,14 @@ class EnvironmentVariables {
   @Min(0)
   @Max(15)
   REDIS_DB!: number;
+
+  @IsOptional()
+  @IsString()
+  REDIS_PASSWORD?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  REDIS_TLS?: boolean;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

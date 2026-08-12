@@ -46,6 +46,9 @@ Seeded logins, all with password `password123`:
 | `bob@ledgercore.test` | user | ₦50,000 |
 | `admin@ledgercore.test` | admin | — |
 
+Deployment instructions for a free Render + Neon + Upstash setup are in
+[DEPLOY.md](DEPLOY.md).
+
 ---
 
 ## Architecture
