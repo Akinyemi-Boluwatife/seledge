@@ -16,10 +16,14 @@ import {
   TransactionType,
 } from '../generated/prisma/enums';
 import { AccountModel } from '../generated/prisma/models';
+import { AuditAction, AuditService } from '../audit/audit.service';
+import { ActorType } from '../generated/prisma/enums';
 import { LedgerService } from '../ledger/ledger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/types/authenticated-user';
+import { PaginatedDto, paginate } from '../common/dto/pagination.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { TransactionQueryDto } from './dto/transaction-query.dto';
 import { TransactionResponseDto } from './dto/transaction-response.dto';
 
 @Injectable()
@@ -27,6 +31,7 @@ export class TransfersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
+    private readonly audit: AuditService,
   ) {}
 
   async transfer(
@@ -79,6 +84,24 @@ export class TransfersService {
         },
       ]);
 
+      await this.audit.record(tx, {
+        actorType: ActorType.USER,
+        actorId: user.userId,
+        action: AuditAction.TRANSFER_COMPLETED,
+        entityType: 'transaction',
+        entityId: transaction.id,
+        payload: {
+          reference: transaction.reference,
+          amount: amount.toString(),
+          currency: source.currency,
+          sourceAccountId: source.id,
+          destinationAccountId: destination.id,
+          sourceBalanceAfter: entries
+            .find((e) => e.accountId === source.id)
+            ?.balanceAfter.toString(),
+        },
+      });
+
       return TransactionResponseDto.from(transaction, entries);
     });
   }
@@ -110,6 +133,42 @@ export class TransfersService {
       throw new AccountNotFoundException(accountNumber);
     }
     return account.id;
+  }
+
+  async findForAccount(
+    accountId: string,
+    query: TransactionQueryDto,
+  ): Promise<PaginatedDto<TransactionResponseDto>> {
+    const where: Prisma.TransactionWhereInput = {
+      ledgerEntries: { some: { accountId } },
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.from || query.to
+        ? {
+            createdAt: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        where,
+        include: { ledgerEntries: true },
+        orderBy: { createdAt: 'desc' },
+        skip: query.skip,
+        take: query.limit,
+      }),
+      this.prisma.transaction.count({ where }),
+    ]);
+
+    return paginate(
+      rows.map((row) => TransactionResponseDto.from(row, row.ledgerEntries)),
+      total,
+      query,
+    );
   }
 
   async findOne(

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiNotFoundResponse,
@@ -7,6 +7,10 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/types/authenticated-user';
+import { PaginatedDto } from '../common/dto/pagination.dto';
+import { TransactionQueryDto } from '../transfers/dto/transaction-query.dto';
+import { TransactionResponseDto } from '../transfers/dto/transaction-response.dto';
+import { TransfersService } from '../transfers/transfers.service';
 import { AccountsService } from './accounts.service';
 import { AccountResponseDto } from './dto/account-response.dto';
 import { BalanceResponseDto } from './dto/balance-response.dto';
@@ -15,7 +19,10 @@ import { BalanceResponseDto } from './dto/balance-response.dto';
 @ApiBearerAuth()
 @Controller('accounts')
 export class AccountsController {
-  constructor(private readonly accountsService: AccountsService) {}
+  constructor(
+    private readonly accountsService: AccountsService,
+    private readonly transfersService: TransfersService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List your own accounts (admins see all)' })
@@ -50,5 +57,17 @@ export class AccountsController {
     return BalanceResponseDto.from(
       await this.accountsService.getBalance(id, user),
     );
+  }
+
+  @Get(':id/transactions')
+  @ApiOperation({ summary: 'Paginated transaction history for your account' })
+  @ApiNotFoundResponse({ description: 'Account does not exist or is not yours' })
+  async transactions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: TransactionQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<PaginatedDto<TransactionResponseDto>> {
+    const account = await this.accountsService.findOne(id, user);
+    return this.transfersService.findForAccount(account.id, query);
   }
 }

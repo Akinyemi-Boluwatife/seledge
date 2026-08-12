@@ -8,5 +8,6 @@ import { TransfersService } from './transfers.service';
   imports: [LedgerModule, IdempotencyModule],
   controllers: [TransfersController],
   providers: [TransfersService],
+  exports: [TransfersService],
 })
 export class TransfersModule {}

@@ -12,6 +12,8 @@ import {
   TransactionStatus,
   TransactionType,
 } from '../generated/prisma/enums';
+import { AuditAction, AuditService } from '../audit/audit.service';
+import { ActorType } from '../generated/prisma/enums';
 import { LedgerService } from '../ledger/ledger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/types/authenticated-user';
@@ -24,6 +26,7 @@ export class WithdrawalsService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly accounts: AccountsService,
+    private readonly audit: AuditService,
   ) {}
 
   async withdraw(
@@ -74,6 +77,22 @@ export class WithdrawalsService {
           amount,
         },
       ]);
+
+      await this.audit.record(tx, {
+        actorType: ActorType.USER,
+        actorId: user.userId,
+        action: AuditAction.WITHDRAWAL_COMPLETED,
+        entityType: 'transaction',
+        entityId: transaction.id,
+        payload: {
+          reference: transaction.reference,
+          amount: amount.toString(),
+          accountId: account.id,
+          balanceAfter: entries
+            .find((e) => e.accountId === account.id)
+            ?.balanceAfter.toString(),
+        },
+      });
 
       return TransactionResponseDto.from(transaction, entries);
     });

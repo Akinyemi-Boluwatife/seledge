@@ -7,10 +7,12 @@ import {
 } from '../common/exceptions/domain.exception';
 import {
   AccountStatus,
+  ActorType,
   LedgerDirection,
   TransactionStatus,
   TransactionType,
 } from '../generated/prisma/enums';
+import { AuditAction, AuditService } from '../audit/audit.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/types/authenticated-user';
@@ -34,6 +36,7 @@ export class DepositsService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly accounts: AccountsService,
+    private readonly audit: AuditService,
   ) {}
 
   async initiate(
@@ -51,16 +54,33 @@ export class DepositsService {
     }
 
     // No ledger entries yet: nothing has actually been paid.
-    const transaction = await this.prisma.transaction.create({
-      data: {
-        type: TransactionType.DEPOSIT,
-        status: TransactionStatus.PENDING,
-        reference: generateDepositReference(),
-        amount: BigInt(dto.amount),
-        currency: account.currency,
-        initiatedByUserId: user.userId,
-        metadata: { accountId: account.id, provider: 'mockpay' },
-      },
+    const transaction = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.transaction.create({
+        data: {
+          type: TransactionType.DEPOSIT,
+          status: TransactionStatus.PENDING,
+          reference: generateDepositReference(),
+          amount: BigInt(dto.amount),
+          currency: account.currency,
+          initiatedByUserId: user.userId,
+          metadata: { accountId: account.id, provider: 'mockpay' },
+        },
+      });
+
+      await this.audit.record(tx, {
+        actorType: ActorType.USER,
+        actorId: user.userId,
+        action: AuditAction.DEPOSIT_INITIATED,
+        entityType: 'transaction',
+        entityId: created.id,
+        payload: {
+          reference: created.reference,
+          amount: created.amount.toString(),
+          accountId: account.id,
+        },
+      });
+
+      return created;
     });
 
     return {
@@ -120,6 +140,20 @@ export class DepositsService {
           amount: transaction.amount,
         },
       ]);
+
+      await this.audit.record(tx, {
+        actorType: ActorType.SYSTEM,
+        actorId: null,
+        action: AuditAction.DEPOSIT_COMPLETED,
+        entityType: 'transaction',
+        entityId: transaction.id,
+        payload: {
+          reference: transaction.reference,
+          amount: transaction.amount.toString(),
+          accountId,
+          provider: 'mockpay',
+        },
+      });
 
       return 'APPLIED';
     });
