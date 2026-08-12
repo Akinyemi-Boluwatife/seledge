@@ -16,6 +16,12 @@ export class InvalidCredentialsException extends DomainException {
   }
 }
 
+export class InvalidWebhookSignatureException extends DomainException {
+  constructor() {
+    super('INVALID_SIGNATURE', 'Invalid signature', HttpStatus.UNAUTHORIZED);
+  }
+}
+
 export class ForbiddenRoleException extends DomainException {
   constructor() {
     super('FORBIDDEN', 'Insufficient role', HttpStatus.FORBIDDEN);

@@ -7,6 +7,8 @@ import { AccountType, Role } from '../generated/prisma/enums';
 import { AuthenticatedUser } from '../auth/types/authenticated-user';
 import { MutableAccountStatus } from './dto/update-account-status.dto';
 
+export const SYSTEM_CASH_NUMBER = '0000000000';
+
 const ACCOUNT_NUMBER_LENGTH = 10;
 const MAX_GENERATION_ATTEMPTS = 5;
 
@@ -32,6 +34,12 @@ export class AccountsService {
     throw new Error(
       `Could not generate a unique account number after ${MAX_GENERATION_ATTEMPTS} attempts`,
     );
+  }
+
+  findSystemCash(tx: Prisma.TransactionClient = this.prisma) {
+    return tx.account.findUniqueOrThrow({
+      where: { accountNumber: SYSTEM_CASH_NUMBER },
+    });
   }
 
   findAllForUser(user: AuthenticatedUser): Promise<AccountModel[]> {

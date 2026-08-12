@@ -12,6 +12,21 @@ export interface LedgerEntryInput {
 
 @Injectable()
 export class LedgerService {
+  // ORDER BY id means every caller locks accounts in the same sequence, so
+  // simultaneous opposing transfers cannot each hold the row the other needs.
+  async lockAccounts(
+    tx: Prisma.TransactionClient,
+    accountIds: string[],
+  ): Promise<void> {
+    const ids = [...new Set(accountIds)];
+    await tx.$queryRaw`
+      SELECT id FROM accounts
+      WHERE id = ANY(${ids}::uuid[])
+      ORDER BY id
+      FOR UPDATE
+    `;
+  }
+
   async post(
     tx: Prisma.TransactionClient,
     transactionId: string,

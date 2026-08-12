@@ -32,6 +32,10 @@ class EnvironmentVariables {
   @IsInt()
   @Min(60)
   JWT_EXPIRES_IN_SECONDS!: number;
+
+  @IsString()
+  @MinLength(32)
+  WEBHOOK_SECRET!: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

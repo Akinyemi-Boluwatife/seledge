@@ -5,7 +5,9 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody is required to verify webhook HMAC signatures over the exact bytes
+  // received; it cannot be recovered after JSON parsing.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new GlobalExceptionFilter());

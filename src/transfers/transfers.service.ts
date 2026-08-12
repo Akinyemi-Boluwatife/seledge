@@ -46,7 +46,7 @@ export class TransfersService {
         dto.destinationAccountNumber,
       );
 
-      await lockAccounts(tx, [sourceId, destinationId]);
+      await this.ledger.lockAccounts(tx, [sourceId, destinationId]);
 
       // Re-read after locking: the balance may have moved while we waited.
       const source = await tx.account.findUniqueOrThrow({
@@ -130,21 +130,6 @@ export class TransfersService {
 
     return TransactionResponseDto.from(transaction, transaction.ledgerEntries);
   }
-}
-
-// ORDER BY id means every transfer locks accounts in the same sequence, so
-// simultaneous A->B and B->A cannot each hold the row the other needs.
-async function lockAccounts(
-  tx: Prisma.TransactionClient,
-  accountIds: string[],
-): Promise<void> {
-  const ids = [...new Set(accountIds)];
-  await tx.$queryRaw`
-    SELECT id FROM accounts
-    WHERE id = ANY(${ids}::uuid[])
-    ORDER BY id
-    FOR UPDATE
-  `;
 }
 
 function assertTransferable(
