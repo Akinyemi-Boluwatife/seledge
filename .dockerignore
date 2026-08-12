@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.git
+.github
+docs
+test
+src/generated
+.env
+.env.*
+!.env.example
+*.log
+.claude
+skills-lock.json

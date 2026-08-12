@@ -8,7 +8,7 @@ async function bootstrap() {
   // rawBody is required to verify webhook HMAC signatures over the exact bytes
   // received; it cannot be recovered after JSON parsing.
   const app = await NestFactory.create(AppModule, { rawBody: true });
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', { exclude: ['health'] });
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new GlobalExceptionFilter());
 

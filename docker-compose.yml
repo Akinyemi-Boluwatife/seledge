@@ -31,6 +31,61 @@ services:
       timeout: 5s
       retries: 10
 
+  # Runs once and exits. Built from the `build` stage because that is the only
+  # image carrying the Prisma CLI.
+  migrate:
+    build:
+      context: .
+      target: build
+    container_name: ledgercore-migrate
+    profiles: [full]
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    command: npx prisma migrate deploy
+
+  app:
+    build: .
+    container_name: ledgercore-app
+    restart: unless-stopped
+    # Only started with `docker compose --profile full up`; day-to-day the app
+    # runs on the host with hot reload against these same containers.
+    profiles: [full]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN_SECONDS: ${JWT_EXPIRES_IN_SECONDS:-900}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+    ports:
+      - '${APP_PORT:-3000}:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
 volumes:
   postgres-data:
   redis-data:
