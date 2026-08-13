@@ -1,4 +1,5 @@
 import { ValidationPipe } from '@nestjs/common';
+import type { Response } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -22,6 +23,11 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, () =>
     SwaggerModule.createDocument(app, config),
   );
+
+  // Nothing is served at the root, and a bare 404 reads as a broken deployment.
+  app
+    .getHttpAdapter()
+    .get('/', (_req: unknown, res: Response) => res.redirect('/docs'));
 
   await app.listen(process.env.PORT ?? 3000);
 }

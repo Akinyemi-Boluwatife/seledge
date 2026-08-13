@@ -23,7 +23,19 @@ would take the ledger with it.
    postgresql://USER:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
    ```
 
-3. Keep it for step 3. `sslmode=require` must stay in the string.
+3. Keep it for step 3. The SSL parameter must stay in the string.
+
+Change `sslmode=require` to `sslmode=verify-full`. The Postgres driver currently
+treats them as the same thing but warns on every boot, because a future major
+version will make `require` weaker:
+
+```
+SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca'
+are treated as aliases for 'verify-full'.
+```
+
+`verify-full` is the behaviour you already have; naming it explicitly keeps it
+after the driver changes.
 
 Use the pooled endpoint, not the direct one — Render restarts the container on
 every deploy, and pooling avoids exhausting connection slots.
@@ -42,6 +54,15 @@ every deploy, and pooling avoids exhausting connection slots.
 
 The REST endpoint only works with Upstash's own SDK and does not support the
 blocking commands BullMQ relies on. It will not work here.
+
+3. **Turn eviction off.** In the database's configuration, set the eviction
+   policy to `noeviction`. Upstash defaults to evicting keys under memory
+   pressure, which for BullMQ means silently discarding queued jobs. The app
+   logs a loud warning on every connection until this is changed:
+
+   ```
+   IMPORTANT! Eviction policy is optimistic-volatile. It should be "noeviction"
+   ```
 
 Check Upstash's current BullMQ guide before relying on this. Blocking commands
 have documented caveats on their free tier. If it misbehaves, statements are the
@@ -146,6 +167,10 @@ scheduled jobs, so nightly reconciliation and hourly cleanup would never fire.
 2. New monitor → **HTTP(s)** → `https://<your-app>.onrender.com/health`.
 3. Interval: 5 minutes (the free minimum; the 15-minute sleep gives margin).
 
+**Point it at `/health`, not the bare domain.** Monitoring
+`https://<your-app>.onrender.com` on its own reports the service as *down*: the
+root only redirects to the docs, and any non-2xx counts as a failure.
+
 `/health` also checks the database, so the monitor doubles as real alerting
 rather than just a keep-alive.
 
@@ -171,7 +196,8 @@ curl -X POST https://<your-app>.onrender.com/api/v1/auth/register \
   -d '{"email":"you@example.com","password":"a-real-password"}'
 ```
 
-Docs at `https://<your-app>.onrender.com/docs`.
+Docs at `https://<your-app>.onrender.com/docs`, and the root redirects there,
+so the bare URL is safe to share.
 
 ## 7. Optional: seed demo data
 
@@ -214,3 +240,12 @@ must use the TCP endpoint rather than the REST/HTTPS one.
 
 **First request takes ~50 seconds** — the instance was asleep. Confirm the
 UptimeRobot monitor is running and pointed at the right URL.
+
+**UptimeRobot reports the service down while it is clearly up** — the monitor is
+pointed at the bare domain instead of `/health`.
+
+**`Eviction policy is optimistic-volatile`** — set Upstash eviction to
+`noeviction`, otherwise queued jobs can be dropped under memory pressure.
+
+**`SSL modes ... are treated as aliases for 'verify-full'`** — change
+`sslmode=require` to `sslmode=verify-full` in `DATABASE_URL`.
