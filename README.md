@@ -243,9 +243,3 @@ schedule rather than stacking duplicate timers.
 | Refresh tokens | Not implemented | Stretch goal in the spec |
 
 ---
-
-## Out of scope
-
-Microservices and message brokers, distributed locks, Prometheus/Grafana,
-GraphQL, Kubernetes, multi-currency FX, real payment provider integration, KYC,
-fees, overdrafts.
