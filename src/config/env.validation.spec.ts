@@ -2,7 +2,7 @@ import { validateEnv } from './env.validation';
 
 const VALID = {
   DATABASE_URL:
-    'postgresql://user:pass@localhost:5432/ledgercore?schema=public',
+    'postgresql://user:pass@localhost:5432/seledge?schema=public',
   JWT_SECRET: 'a-secret-that-is-at-least-32-characters-long',
   WEBHOOK_SECRET: 'another-secret-at-least-32-characters-long',
   REDIS_HOST: 'localhost',

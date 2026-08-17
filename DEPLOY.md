@@ -1,4 +1,4 @@
-# Deploying LedgerCore for free
+# Deploying Seledge for free
 
 Three providers, because no single free tier gives all three pieces without a
 catch. Roughly 30 minutes end to end.

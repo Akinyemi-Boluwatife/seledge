@@ -1,4 +1,4 @@
-# LedgerCore
+# Seledge
 
 [![CI](https://github.com/Akinyemi-Boluwatife/seledge/actions/workflows/ci.yml/badge.svg)](https://github.com/Akinyemi-Boluwatife/seledge/actions/workflows/ci.yml)
 
@@ -42,9 +42,9 @@ Seeded logins, all with password `password123`:
 
 | Email | Role | Opening balance |
 |---|---|---|
-| `alice@ledgercore.test` | user | ₦50,000 |
-| `bob@ledgercore.test` | user | ₦50,000 |
-| `admin@ledgercore.test` | admin | — |
+| `alice@seledge.test` | user | ₦50,000 |
+| `bob@seledge.test` | user | ₦50,000 |
+| `admin@seledge.test` | admin | — |
 
 Deployment instructions for a free Render + Neon + Upstash setup are in
 [DEPLOY.md](DEPLOY.md).
@@ -198,7 +198,7 @@ npm test          # 51 unit tests, no database
 npm run test:e2e  # 102 integration tests against real Postgres and Redis
 ```
 
-Integration tests run against a separate `ledgercore_test` database, reset with
+Integration tests run against a separate `seledge_test` database, reset with
 `TRUNCATE` between tests — `DELETE` would hit the append-only triggers.
 
 What the suite proves beyond the happy path:

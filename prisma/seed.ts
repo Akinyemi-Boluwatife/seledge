@@ -22,8 +22,8 @@ const prisma = new PrismaClient({
 });
 
 const testUsers = [
-  { email: 'alice@ledgercore.test', accountNumber: '1000000001' },
-  { email: 'bob@ledgercore.test', accountNumber: '1000000002' },
+  { email: 'alice@seledge.test', accountNumber: '1000000001' },
+  { email: 'bob@seledge.test', accountNumber: '1000000002' },
 ];
 
 async function main() {
@@ -44,10 +44,10 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: 'admin@ledgercore.test' },
+    where: { email: 'admin@seledge.test' },
     update: {},
     create: {
-      email: 'admin@ledgercore.test',
+      email: 'admin@seledge.test',
       passwordHash,
       role: Role.ADMIN,
     },

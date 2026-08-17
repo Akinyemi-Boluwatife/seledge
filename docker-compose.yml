@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: ledgercore-postgres
+    container_name: seledge-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -19,7 +19,7 @@ services:
 
   redis:
     image: redis:8-alpine
-    container_name: ledgercore-redis
+    container_name: seledge-redis
     restart: unless-stopped
     ports:
       - '${REDIS_PORT:-6379}:6379'
@@ -37,7 +37,7 @@ services:
     build:
       context: .
       target: build
-    container_name: ledgercore-migrate
+    container_name: seledge-migrate
     profiles: [full]
     restart: 'no'
     depends_on:
@@ -49,7 +49,7 @@ services:
 
   app:
     build: .
-    container_name: ledgercore-app
+    container_name: seledge-app
     restart: unless-stopped
     # Only started with `docker compose --profile full up`; day-to-day the app
     # runs on the host with hot reload against these same containers.
