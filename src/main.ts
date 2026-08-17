@@ -14,7 +14,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const config = new DocumentBuilder()
-    .setTitle('LedgerCore')
+    .setTitle('Seledge')
     .setDescription('Double-entry wallet and ledger API')
     .setVersion('1.0')
     .addBearerAuth()
